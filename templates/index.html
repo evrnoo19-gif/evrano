@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Evranoo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════
+   ROOT & RESET
+═══════════════════════════════════════════════ */
+:root {
+  --bg:        #080c12;
+  --bg2:       #0d1420;
+  --surface:   rgba(255,255,255,0.04);
+  --border:    rgba(255,255,255,0.08);
+  --gold:      #c9a84c;
+  --gold2:     #f0d080;
+  --gold-dim:  rgba(201,168,76,0.18);
+  --cyan:      #4ecdc4;
+  --cyan-dim:  rgba(78,205,196,0.15);
+  --red:       #e05c5c;
+  --red-dim:   rgba(224,92,92,0.15);
+  --text:      #e8e2d6;
+  --text-muted:#7a7468;
+  --font-disp: 'Cormorant Garamond', serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --radius:    16px;
+  --glow-gold: 0 0 40px rgba(201,168,76,0.25);
+  --glow-cyan: 0 0 40px rgba(78,205,196,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+button{cursor:pointer;font-family:var(--font-body)}
+input{font-family:var(--font-body)}
+
+/* ═══════════════════════════════════════════════
+   CANVAS PARTICLES
+═══════════════════════════════════════════════ */
+#particle-canvas{
+  position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+}
+
+/* ═══════════════════════════════════════════════
+   PASSWORD SCREEN
+═══════════════════════════════════════════════ */
+#lock-screen{
+  position:fixed;inset:0;z-index:1000;
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:2rem;
+  transition:opacity .8s ease, transform .8s ease;
+}
+#lock-screen.hide{opacity:0;transform:scale(1.04);pointer-events:none}
+
+.lock-logo{
+  font-family:var(--font-disp);
+  font-size:clamp(3rem,10vw,6rem);
+  font-weight:300;
+  letter-spacing:.3em;
+  color:var(--gold);
+  text-shadow:0 0 60px rgba(201,168,76,.5);
+  animation:logoFloat 4s ease-in-out infinite;
+}
+@keyframes logoFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-10px)}
+}
+.lock-sub{
+  font-size:.75rem;letter-spacing:.4em;
+  color:var(--text-muted);text-transform:uppercase;
+  margin-top:-.5rem;
+}
+.lock-form{
+  display:flex;flex-direction:column;align-items:center;gap:1rem;
+  width:min(300px,90vw);
+}
+.lock-input-wrap{
+  width:100%;position:relative;
+}
+.lock-input{
+  width:100%;padding:1rem 1.25rem;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  border-radius:12px;
+  color:var(--text);font-size:1rem;
+  letter-spacing:.3em;text-align:center;
+  outline:none;
+  transition:border-color .3s, box-shadow .3s;
+}
+.lock-input:focus{
+  border-color:var(--gold);
+  box-shadow:0 0 20px rgba(201,168,76,.2);
+}
+.lock-input.error{
+  border-color:var(--red);
+  box-shadow:0 0 20px rgba(224,92,92,.2);
+  animation:shake .4s ease;
+}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  60%{transform:translateX(8px)}
+  80%{transform:translateX(-4px)}
+}
+.lock-btn{
+  width:100%;padding:.85rem;
+  background:linear-gradient(135deg,var(--gold),#a8782a);
+  border:none;border-radius:12px;
+  color:#0a0800;font-weight:600;
+  font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;
+  transition:opacity .2s,transform .2s,box-shadow .2s;
+}
+.lock-btn:hover{opacity:.9;transform:translateY(-1px);box-shadow:var(--glow-gold)}
+.lock-err{
+  font-size:.8rem;color:var(--red);letter-spacing:.05em;
+  min-height:1.2rem;text-align:center;
+}
+.lock-ornament{
+  width:160px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  margin:.5rem auto;
+}
+
+/* ═══════════════════════════════════════════════
+   APP SHELL
+═══════════════════════════════════════════════ */
+#app{
+  position:relative;z-index:1;
+  min-height:100vh;
+  display:none;flex-direction:column;
+}
+#app.visible{display:flex}
+
+/* ─── Header ─────────────────────────────────── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 2rem;
+  border-bottom:1px solid var(--border);
+  background:rgba(8,12,18,.85);
+  backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:100;
+}
+.header-logo{
+  font-family:var(--font-disp);
+  font-size:1.8rem;font-weight:300;letter-spacing:.25em;
+  color:var(--gold);
+  text-shadow:0 0 30px rgba(201,168,76,.4);
+}
+.header-date{
+  font-size:.75rem;color:var(--text-muted);
+  letter-spacing:.1em;text-align:right;line-height:1.6;
+}
+.logout-btn{
+  background:none;border:1px solid var(--border);
+  color:var(--text-muted);padding:.4rem .85rem;
+  border-radius:8px;font-size:.75rem;
+  letter-spacing:.08em;text-transform:uppercase;
+  transition:all .2s;
+}
+.logout-btn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ─── Nav tabs ───────────────────────────────── */
+.nav{
+  display:flex;gap:0;
+  padding:.75rem 1.5rem 0;
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;scrollbar-width:none;
+  background:rgba(8,12,18,.6);
+  backdrop-filter:blur(10px);
+  position:sticky;top:65px;z-index:99;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{
+  background:none;border:none;
+  color:var(--text-muted);
+  font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;
+  padding:.75rem 1.5rem;
+  border-bottom:2px solid transparent;
+  white-space:nowrap;
+  transition:all .25s;
+  position:relative;
+}
+.nav-btn::after{
+  content:'';position:absolute;bottom:-2px;left:50%;right:50%;
+  height:2px;background:var(--gold);
+  transition:left .25s,right .25s;
+}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.active{color:var(--gold)}
+.nav-btn.active::after{left:0;right:0}
+
+/* ─── Page container ─────────────────────────── */
+.pages{flex:1}
+.page{
+  display:none;
+  padding:2rem;
+  animation:fadeUp .4s ease;
+  max-width:1400px;margin:0 auto;
+}
+.page.active{display:block}
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(16px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* ═══════════════════════════════════════════════
+   SHARED COMPONENTS
+═══════════════════════════════════════════════ */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:1.5rem;
+  backdrop-filter:blur(12px);
+  position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+}
+.card-title{
+  font-family:var(--font-disp);
+  font-size:1.3rem;font-weight:400;
+  color:var(--gold2);letter-spacing:.08em;
+  margin-bottom:1.25rem;
+}
+.section-title{
+  font-family:var(--font-disp);
+  font-size:2rem;font-weight:300;
+  color:var(--text);letter-spacing:.12em;
+  margin-bottom:.4rem;
+}
+.section-sub{
+  font-size:.75rem;color:var(--text-muted);
+  letter-spacing:.15em;text-transform:uppercase;
+  margin-bottom:2rem;
+}
+.ornament-line{
+  width:60px;height:1px;
+  background:linear-gradient(90deg,var(--gold),transparent);
+  margin:.75rem 0 2rem;
+}
+
+/* ─── Grid helpers ───────────────────────────── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+@media(max-width:900px){
+  .grid-3{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .page{padding:1rem}
+  .header{padding:1rem}
+  .nav{padding:.5rem 1rem 0}
+}
+
+/* ═══════════════════════════════════════════════
+   PAGE 1 — MARKET (IHSG / EMAS / RUPIAH)
+═══════════════════════════════════════════════ */
+.market-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:1.5rem;
+}
+.tv-widget-wrap{
+  border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--border);
+  background:#131722;
+}
+.widget-label{
+  font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);padding:.75rem 1rem .25rem;
+  background:#131722;
+}
+
+/* ═══════════════════════════════════════════════
+   PAGE 2 — SAVINGS
+═══════════════════════════════════════════════ */
+.savings-hero{
+  text-align:center;padding:2rem 1rem;
+}
+.savings-balance{
+  font-family:var(--font-disp);
+  font-size:clamp(2.5rem,6vw,4rem);
+  font-weight:300;color:var(--gold2);
+  text-shadow:var(--glow-gold);
+  letter-spacing:.05em;
+  transition:all .4s ease;
+}
+.savings-balance.animate{transform:scale(1.05)}
+.savings-label{
+  font-size:.75rem;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--text-muted);margin-top:.25rem;
+}
+.progress-wrap{margin:1.5rem 0}
+.progress-bar-bg{
+  height:8px;border-radius:999px;
+  background:rgba(255,255,255,.06);
+  overflow:hidden;
+}
+.progress-bar-fill{
+  height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  box-shadow:0 0 12px rgba(201,168,76,.5);
+  transition:width .8s cubic-bezier(.4,0,.2,1);
+  width:0%;
+}
+.progress-pct{
+  font-size:.8rem;color:var(--text-muted);
+  margin-top:.5rem;text-align:right;
+}
+.target-row{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:.8rem;color:var(--text-muted);letter-spacing:.05em;
+  margin-bottom:.5rem;
+}
+.savings-actions{
+  display:grid;grid-template-columns:1fr 1fr;gap:1rem;
+  margin-top:1.5rem;
+}
+.amount-input{
+  width:100%;padding:.8rem 1rem;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:1rem;
+  outline:none;text-align:center;
+  transition:border-color .3s;margin-bottom:.75rem;
+}
+.amount-input:focus{border-color:var(--gold)}
+.btn-add{
+  padding:.8rem;border:none;border-radius:10px;
+  background:linear-gradient(135deg,var(--cyan),#2aaba2);
+  color:#030d0c;font-weight:600;font-size:.85rem;
+  letter-spacing:.08em;text-transform:uppercase;
+  transition:all .2s;
+}
+.btn-add:hover{transform:translateY(-2px);box-shadow:var(--glow-cyan)}
+.btn-sub{
+  padding:.8rem;border:none;border-radius:10px;
+  background:linear-gradient(135deg,var(--red),#b83a3a);
+  color:#fff;font-weight:600;font-size:.85rem;
+  letter-spacing:.08em;text-transform:uppercase;
+  transition:all .2s;
+}
+.btn-sub:hover{transform:translateY(-2px);box-shadow:0 0 20px rgba(224,92,92,.3)}
+.note-input{
+  width:100%;padding:.7rem 1rem;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:.85rem;
+  outline:none;margin-bottom:.75rem;
+}
+.note-input:focus{border-color:rgba(255,255,255,.2)}
+.set-target-wrap{display:flex;gap:.75rem;margin-top:1rem}
+.set-target-input{
+  flex:1;padding:.7rem 1rem;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-size:.85rem;outline:none;
+}
+.set-target-input:focus{border-color:var(--gold)}
+.btn-target{
+  padding:.7rem 1.25rem;border:1px solid var(--gold);
+  background:var(--gold-dim);border-radius:10px;
+  color:var(--gold);font-size:.8rem;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;
+  transition:all .2s;white-space:nowrap;
+}
+.btn-target:hover{background:var(--gold);color:#0a0800}
+
+/* History */
+.history-list{
+  max-height:260px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:.5rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.history-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.65rem 1rem;
+  background:rgba(255,255,255,.03);
+  border-radius:8px;border:1px solid var(--border);
+  font-size:.82rem;
+  animation:fadeUp .3s ease;
+}
+.history-item .h-amount{font-weight:600;letter-spacing:.03em}
+.history-item .h-amount.pos{color:var(--cyan)}
+.history-item .h-amount.neg{color:var(--red)}
+.history-item .h-note{color:var(--text-muted);flex:1;margin:0 .75rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-item .h-date{color:var(--text-muted);font-size:.72rem;white-space:nowrap}
+
+/* ═══════════════════════════════════════════════
+   PAGE 3 — HABITS
+═══════════════════════════════════════════════ */
+.habits-layout{
+  display:grid;
+  grid-template-columns:350px 1fr;
+  gap:1.5rem;
+  align-items:start;
+}
+@media(max-width:900px){
+  .habits-layout{grid-template-columns:1fr}
+}
+.habit-add-row{
+  display:flex;gap:.75rem;margin-bottom:1.25rem;
+}
+.habit-input{
+  flex:1;padding:.75rem 1rem;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-size:.9rem;outline:none;
+  transition:border-color .3s;
+}
+.habit-input:focus{border-color:var(--cyan)}
+.btn-habit-add{
+  padding:.75rem 1.25rem;border:none;border-radius:10px;
+  background:var(--cyan);color:#030d0c;
+  font-weight:600;font-size:.85rem;
+  transition:all .2s;white-space:nowrap;
+}
+.btn-habit-add:hover{transform:translateY(-2px);box-shadow:var(--glow-cyan)}
+.habit-list{
+  display:flex;flex-direction:column;gap:.6rem;
+  min-height:80px;
+}
+.habit-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.8rem 1rem;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);border-radius:10px;
+  transition:all .25s;
+  animation:fadeUp .3s ease;
+  cursor:pointer;
+}
+.habit-item:hover{border-color:rgba(78,205,196,.3);background:var(--cyan-dim)}
+.habit-item.checked{
+  border-color:rgba(78,205,196,.5);
+  background:var(--cyan-dim);
+}
+.habit-check{
+  width:22px;height:22px;border-radius:6px;
+  border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .2s;margin-right:.75rem;
+  font-size:.85rem;
+}
+.habit-item.checked .habit-check{
+  background:var(--cyan);border-color:var(--cyan);
+}
+.habit-name{flex:1;font-size:.9rem;letter-spacing:.03em}
+.habit-del{
+  background:none;border:none;
+  color:var(--text-muted);font-size:.9rem;padding:.2rem .4rem;
+  border-radius:4px;transition:all .2s;opacity:0;
+}
+.habit-item:hover .habit-del{opacity:1}
+.habit-del:hover{color:var(--red)}
+
+.today-score{
+  text-align:center;padding:1rem 0 1.5rem;
+}
+.score-num{
+  font-family:var(--font-disp);
+  font-size:3.5rem;font-weight:300;
+  color:var(--cyan);text-shadow:var(--glow-cyan);
+  line-height:1;
+}
+.score-label{
+  font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--text-muted);margin-top:.25rem;
+}
+.chart-wrap{position:relative;height:260px}
+.chart-tooltip-custom{
+  position:absolute;
+  background:rgba(13,20,32,.95);
+  border:1px solid var(--border);
+  border-radius:10px;padding:.75rem 1rem;
+  font-size:.8rem;pointer-events:none;
+  transform:translate(-50%,-110%);
+  white-space:nowrap;z-index:10;
+  display:none;
+}
+
+/* ═══════════════════════════════════════════════
+   TOAST NOTIFICATIONS
+═══════════════════════════════════════════════ */
+.toast-wrap{
+  position:fixed;bottom:2rem;right:2rem;
+  z-index:9999;display:flex;flex-direction:column;gap:.5rem;
+}
+.toast{
+  background:rgba(13,20,32,.95);
+  border:1px solid var(--border);border-radius:10px;
+  padding:.75rem 1.25rem;font-size:.82rem;
+  backdrop-filter:blur(20px);
+  animation:toastIn .3s ease;
+  max-width:280px;
+}
+.toast.success{border-color:var(--cyan);color:var(--cyan)}
+.toast.error{border-color:var(--red);color:var(--red)}
+.toast.info{border-color:var(--gold);color:var(--gold)}
+@keyframes toastIn{
+  from{opacity:0;transform:translateX(20px)}
+  to{opacity:1;transform:translateX(0)}
+}
+@keyframes toastOut{
+  from{opacity:1;transform:translateX(0)}
+  to{opacity:0;transform:translateX(20px)}
+}
+
+/* ═══════════════════════════════════════════════
+   LOADING SPINNER
+═══════════════════════════════════════════════ */
+.spinner{
+  width:32px;height:32px;border-radius:50%;
+  border:2px solid var(--border);
+  border-top-color:var(--gold);
+  animation:spin .8s linear infinite;
+  margin:2rem auto;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── Empty state ─────────────────────────── */
+.empty{
+  text-align:center;padding:2rem;
+  color:var(--text-muted);font-size:.85rem;letter-spacing:.08em;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ PARTICLES ══════════════════════════════════════════════ -->
+<canvas id="particle-canvas"></canvas>
+
+<!-- ══ LOCK SCREEN ════════════════════════════════════════════ -->
+<div id="lock-screen">
+  <div class="lock-logo">EVRANOO</div>
+  <div class="lock-sub">Personal Dashboard</div>
+  <div class="lock-ornament"></div>
+  <div class="lock-form">
+    <div class="lock-input-wrap">
+      <input id="pw-input" class="lock-input" type="password"
+             placeholder="· · · · ·" autocomplete="off" maxlength="20"/>
+    </div>
+    <div id="pw-err" class="lock-err"></div>
+    <button class="lock-btn" onclick="doLogin()">Masuk</button>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">EVRANOO</div>
+    <div class="header-date" id="header-date"></div>
+    <button class="logout-btn" onclick="doLogout()">Keluar</button>
+  </header>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showPage('market',this)">📈 Pasar</button>
+    <button class="nav-btn" onclick="showPage('savings',this)">💰 Tabungan</button>
+    <button class="nav-btn" onclick="showPage('habits',this)">✅ Kebiasaan</button>
+  </nav>
+
+  <!-- Pages -->
+  <main class="pages">
+
+    <!-- ── PAGE: MARKET ────────────────────────────────────── -->
+    <section id="page-market" class="page active">
+      <div class="section-title">Pasar Hari Ini</div>
+      <div class="section-sub">Data real-time · IHSG · Emas · Rupiah</div>
+      <div class="ornament-line"></div>
+
+      <div class="market-grid">
+
+        <!-- IHSG -->
+        <div class="tv-widget-wrap">
+          <div class="widget-label">📊 IHSG — Indeks Harga Saham Gabungan</div>
+          <div class="tradingview-widget-container" style="height:400px">
+            <div id="tv-ihsg" style="height:100%"></div>
+          </div>
+        </div>
+
+        <!-- EMAS -->
+        <div class="tv-widget-wrap">
+          <div class="widget-label">🥇 Emas — XAU/USD Spot Price</div>
+          <div class="tradingview-widget-container" style="height:400px">
+            <div id="tv-emas" style="height:100%"></div>
+          </div>
+        </div>
+
+        <!-- RUPIAH -->
+        <div class="tv-widget-wrap">
+          <div class="widget-label">💵 Rupiah — USD/IDR</div>
+          <div class="tradingview-widget-container" style="height:400px">
+            <div id="tv-idr" style="height:100%"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── PAGE: SAVINGS ───────────────────────────────────── -->
+    <section id="page-savings" class="page">
+      <div class="section-title">Tabungan</div>
+      <div class="section-sub">Pantau & kelola simpananmu</div>
+      <div class="ornament-line"></div>
+
+      <div class="grid-2">
+
+        <!-- Balance card -->
+        <div class="card">
+          <div class="card-title">Saldo Saat Ini</div>
+          <div class="savings-hero">
+            <div class="savings-balance" id="savings-balance">Rp 0</div>
+            <div class="savings-label">total simpanan</div>
+          </div>
+          <div class="progress-wrap">
+            <div class="target-row">
+              <span>Target: <span id="savings-target-label">Rp 0</span></span>
+              <span id="savings-pct-label">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="savings-bar"></div>
+            </div>
+          </div>
+
+          <!-- Set target -->
+          <div class="set-target-wrap">
+            <input id="target-input" class="set-target-input" type="number"
+                   placeholder="Ubah target (Rp)" min="0"/>
+            <button cla
